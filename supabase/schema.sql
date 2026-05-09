@@ -83,6 +83,15 @@ CREATE TABLE IF NOT EXISTS settings (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- User Roles (RBAC)
+CREATE TABLE IF NOT EXISTS user_roles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
+  role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'kasir')),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- Default settings
 INSERT INTO settings (key, value) VALUES
   ('margin_threshold', '15'),
@@ -100,6 +109,16 @@ ALTER TABLE po_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_roles ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if exist (to avoid error on re-run)
+DROP POLICY IF EXISTS "auth_all_products" ON products;
+DROP POLICY IF EXISTS "auth_all_price_history" ON price_history;
+DROP POLICY IF EXISTS "auth_all_po_sessions" ON po_sessions;
+DROP POLICY IF EXISTS "auth_all_orders" ON orders;
+DROP POLICY IF EXISTS "auth_all_order_items" ON order_items;
+DROP POLICY IF EXISTS "auth_all_settings" ON settings;
+DROP POLICY IF EXISTS "auth_all_user_roles" ON user_roles;
 
 -- Allow all operations for authenticated users only
 CREATE POLICY "auth_all_products" ON products FOR ALL TO authenticated USING (auth.uid() IS NOT NULL) WITH CHECK (auth.uid() IS NOT NULL);
@@ -108,6 +127,7 @@ CREATE POLICY "auth_all_po_sessions" ON po_sessions FOR ALL TO authenticated USI
 CREATE POLICY "auth_all_orders" ON orders FOR ALL TO authenticated USING (auth.uid() IS NOT NULL) WITH CHECK (auth.uid() IS NOT NULL);
 CREATE POLICY "auth_all_order_items" ON order_items FOR ALL TO authenticated USING (auth.uid() IS NOT NULL) WITH CHECK (auth.uid() IS NOT NULL);
 CREATE POLICY "auth_all_settings" ON settings FOR ALL TO authenticated USING (auth.uid() IS NOT NULL) WITH CHECK (auth.uid() IS NOT NULL);
+CREATE POLICY "auth_all_user_roles" ON user_roles FOR ALL TO authenticated USING (auth.uid() IS NOT NULL) WITH CHECK (auth.uid() IS NOT NULL);
 
 -- ============================================================
 -- Functions & Triggers
@@ -122,8 +142,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Drop existing triggers if exist
+DROP TRIGGER IF EXISTS products_updated_at ON products;
+DROP TRIGGER IF EXISTS orders_updated_at ON orders;
+DROP TRIGGER IF EXISTS user_roles_updated_at ON user_roles;
+
 CREATE TRIGGER products_updated_at BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER orders_updated_at BEFORE UPDATE ON orders FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER user_roles_updated_at BEFORE UPDATE ON user_roles FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- ============================================================
 -- Storage Buckets (run separately in Supabase dashboard or via API)

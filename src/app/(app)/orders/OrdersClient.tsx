@@ -10,6 +10,9 @@ import { Plus, Search, Edit2, Trash2, Receipt } from 'lucide-react'
 import OrderForm from './OrderForm'
 import PaymentModal from './PaymentModal'
 import ReceiptModal from './ReceiptModal'
+import Pagination from '@/components/pagination/Pagination'
+import ExportButtons from '@/components/export/ExportButtons'
+import { usePermission } from '@/hooks/useAuth'
 
 type OrderWithItems = Order & { order_items: OrderItem[] }
 
@@ -28,8 +31,11 @@ const PAYMENT_STATUS_COLORS: Record<string, string> = {
   paid: 'bg-green-100 text-green-700',
 }
 
+const ITEMS_PER_PAGE = 10
+
 export default function OrdersClient({ initialOrders, sessions, products, defaultSessionId, paymentMethods, businessName }: Props) {
   const [orders, setOrders] = useState(initialOrders)
+  const [currentPage, setCurrentPage] = useState(1)
   const [showForm, setShowForm] = useState(false)
   const [editOrder, setEditOrder] = useState<OrderWithItems | null>(null)
   const [paymentOrder, setPaymentOrder] = useState<OrderWithItems | null>(null)
@@ -39,6 +45,10 @@ export default function OrdersClient({ initialOrders, sessions, products, defaul
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterDelivery] = useState('all')
   const supabase = createClient()
+
+  // Permission checks
+  const canDeleteOrders = usePermission('canDeleteOrders')
+  const canExportData = usePermission('canExportData')
 
   const filtered = useMemo(() => {
     return orders.filter(o => {
@@ -55,6 +65,13 @@ export default function OrdersClient({ initialOrders, sessions, products, defaul
       return true
     })
   }, [orders, filterSession, filterStatus, filterDelivery, search])
+
+  // Pagination
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
+  const paginatedOrders = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE
+    return filtered.slice(start, start + ITEMS_PER_PAGE)
+  }, [filtered, currentPage])
 
   function calcOrderTotal(order: OrderWithItems) {
     const subtotal = order.order_items.reduce((s, i) => s + i.subtotal_sell, 0)
@@ -97,17 +114,29 @@ export default function OrdersClient({ initialOrders, sessions, products, defaul
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Pesanan</h1>
           <p className="text-sm text-gray-500">{filtered.length} dari {orders.length} pesanan</p>
         </div>
-        <button
-          onClick={() => { setEditOrder(null); setShowForm(true) }}
-          className="hidden md:flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
-        >
-          <Plus size={16} /> Tambah Pesanan
-        </button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {canExportData && (
+            <ExportButtons 
+              data={filtered} 
+              sessionName={filterSession !== 'all' 
+                ? sessions.find(s => s.id === filterSession)?.name || 'Laporan'
+                : 'Semua Pesanan'
+              }
+              fileName={`pesanan-${new Date().toISOString().split('T')[0]}`}
+            />
+          )}
+          <button
+            onClick={() => { setEditOrder(null); setShowForm(true) }}
+            className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ml-auto"
+          >
+            <Plus size={16} /> Tambah Pesanan
+          </button>
+        </div>
       </div>
 
       {/* Search & Filters */}
@@ -151,7 +180,7 @@ export default function OrdersClient({ initialOrders, sessions, products, defaul
       </div>
 
       {/* Desktop Table */}
-      <div className="hidden md:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <div className="hidden md:block bg-white rounded-2xl border border-gray-100 overflow-hidden mb-4">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
@@ -165,10 +194,10 @@ export default function OrdersClient({ initialOrders, sessions, products, defaul
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {filtered.length === 0 && (
+            {paginatedOrders.length === 0 && (
               <tr><td colSpan={7} className="text-center py-8 text-gray-400">Tidak ada pesanan</td></tr>
             )}
-            {filtered.map(order => (
+            {paginatedOrders.map(order => (
               <tr key={order.id} className="hover:bg-gray-50/50">
                 <td className="px-4 py-3">
                   <p className="font-medium text-gray-900">{order.customer_name}</p>
@@ -220,12 +249,14 @@ export default function OrdersClient({ initialOrders, sessions, products, defaul
                     >
                       <Edit2 size={14} />
                     </button>
-                    <button
-                      onClick={() => handleDelete(order.id)}
-                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    {canDeleteOrders && (
+                      <button
+                        onClick={() => handleDelete(order.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -235,11 +266,11 @@ export default function OrdersClient({ initialOrders, sessions, products, defaul
       </div>
 
       {/* Mobile Cards */}
-      <div className="md:hidden space-y-3">
-        {filtered.length === 0 && (
+      <div className="md:hidden space-y-3 mb-4">
+        {paginatedOrders.length === 0 && (
           <div className="text-center py-12 text-gray-400">Tidak ada pesanan</div>
         )}
-        {filtered.map(order => (
+        {paginatedOrders.map(order => (
           <div key={order.id} className="bg-white rounded-2xl p-4 border border-gray-100">
             <div className="flex items-start justify-between mb-2">
               <div>
@@ -292,16 +323,29 @@ export default function OrdersClient({ initialOrders, sessions, products, defaul
               >
                 Edit
               </button>
-              <button
-                onClick={() => handleDelete(order.id)}
-                className="py-2 px-3 bg-red-50 text-red-700 rounded-lg text-xs font-medium"
-              >
-                Hapus
-              </button>
+              {canDeleteOrders && (
+                <button
+                  onClick={() => handleDelete(order.id)}
+                  className="py-2 px-3 bg-red-50 text-red-700 rounded-lg text-xs font-medium"
+                >
+                  Hapus
+                </button>
+              )}
             </div>
           </div>
         ))}
       </div>
+
+      {/* Pagination */}
+      {filtered.length > ITEMS_PER_PAGE && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          totalItems={filtered.length}
+          itemsPerPage={ITEMS_PER_PAGE}
+        />
+      )}
 
       {/* FAB Mobile */}
       <button
@@ -335,6 +379,9 @@ export default function OrdersClient({ initialOrders, sessions, products, defaul
         <ReceiptModal
           order={receiptOrder}
           businessName={businessName}
+          businessInfo={{
+            paymentInfo: paymentMethods.join(', ')
+          }}
           onClose={() => setReceiptOrder(null)}
         />
       )}

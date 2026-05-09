@@ -10,6 +10,9 @@
     @apply text-gray-900 bg-gray-50;
     font-size: 14px;
     -webkit-tap-highlight-color: transparent;
+    /* PWA optimizations */
+    overscroll-behavior-y: none;
+    -webkit-overflow-scrolling: touch;
   }
 }
 
@@ -17,6 +20,71 @@
   .text-balance {
     text-wrap: balance;
   }
+}
+
+/* PWA Animations */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+/* PWA Specific Styles */
+@supports (-webkit-touch-callout: none) {
+  /* iOS specific styles */
+  .ios-safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .ios-safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Standalone PWA mode styles */
+@media all and (display-mode: standalone) {
+  body {
+    /* Better scrolling in standalone mode */
+    overflow-x: hidden;
+  }
+  
+  /* Hide browser UI elements */
+  .hide-in-standalone {
+    display: none !important;
+  }
+}
+
+/* Prevent pull-to-refresh on mobile */
+@supports (-webkit-touch-callout: none) {
+  body {
+    overscroll-behavior-y: none;
+  }
+}
+
+/* Service Worker update notification */
+.sw-update {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f2937;
+  color: white;
+  padding: 12px 20px;
+  border-radius: 50px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
 }
 
 @media print {

@@ -82,50 +82,69 @@ export default function OrderForm({ order, sessions, products, defaultSessionId,
     setError('')
     const supabase = createClient()
 
-    const orderPayload = {
-      session_id: sessionId,
-      customer_name: customerName,
-      customer_phone: customerPhone,
-      source: source as Order['source'],
-      delivery_type: deliveryType as Order['delivery_type'],
-      delivery_note: deliveryNote || null,
-      delivery_cost: ongkir,
-      delivery_paid_by: deliveryPaidBy as Order['delivery_paid_by'],
-      notes: notes || null,
-      updated_at: new Date().toISOString(),
-    }
+    try {
+      const orderPayload = {
+        session_id: sessionId,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        source: source as Order['source'],
+        delivery_type: deliveryType as Order['delivery_type'],
+        delivery_note: deliveryNote || null,
+        delivery_cost: ongkir,
+        delivery_paid_by: deliveryPaidBy as Order['delivery_paid_by'],
+        notes: notes || null,
+        updated_at: new Date().toISOString(),
+      }
 
-    let orderId = order?.id
-    if (order) {
-      await supabase.from('orders').update(orderPayload).eq('id', order.id)
-      await supabase.from('order_items').delete().eq('order_id', order.id)
-    } else {
-      const { data, error: err } = await supabase
+      let orderId = order?.id
+      if (order) {
+        const { error: updateError } = await supabase.from('orders').update(orderPayload).eq('id', order.id)
+        if (updateError) {
+          throw new Error(updateError.message)
+        }
+        await supabase.from('order_items').delete().eq('order_id', order.id)
+      } else {
+        const { data, error: err } = await supabase
+          .from('orders')
+          .insert({ ...orderPayload, payment_status: 'unpaid', amount_paid: 0 })
+          .select()
+          .single()
+        if (err) { throw new Error(err.message) }
+        orderId = data.id
+      }
+
+      const items = cart.map(item => ({
+        order_id: orderId!,
+        product_id: item.product.id,
+        product_name: item.product.name,
+        buy_price: item.product.current_buy_price,
+        sell_price: item.product.current_sell_price,
+        quantity: item.quantity,
+      }))
+      const { error: itemsError } = await supabase.from('order_items').insert(items)
+      if (itemsError) {
+        throw new Error(itemsError.message)
+      }
+
+      const { data: saved, error: fetchError } = await supabase
         .from('orders')
-        .insert({ ...orderPayload, payment_status: 'unpaid', amount_paid: 0 })
-        .select()
+        .select('*, order_items(*)')
+        .eq('id', orderId!)
         .single()
-      if (err) { setError(err.message); setLoading(false); return }
-      orderId = data.id
+
+      if (fetchError) {
+        throw new Error(fetchError.message)
+      }
+
+      if (saved) {
+        onSaved(saved as OrderWithItems)
+      }
+    } catch (err: any) {
+      console.error('Error saving order:', err)
+      setError(err.message || 'Gagal menyimpan pesanan. Silakan coba lagi.')
+    } finally {
+      setLoading(false)
     }
-
-    const items = cart.map(item => ({
-      order_id: orderId!,
-      product_id: item.product.id,
-      product_name: item.product.name,
-      buy_price: item.product.current_buy_price,
-      sell_price: item.product.current_sell_price,
-      quantity: item.quantity,
-    }))
-    await supabase.from('order_items').insert(items)
-
-    const { data: saved } = await supabase
-      .from('orders')
-      .select('*, order_items(*)')
-      .eq('id', orderId!)
-      .single()
-
-    if (saved) onSaved(saved as OrderWithItems)
   }
 
   return (

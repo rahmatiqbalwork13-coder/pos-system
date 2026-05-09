@@ -216,6 +216,26 @@ export type Database = {
           updated_at?: string
         }
       }
+      user_roles: {
+        Row: {
+          id: string
+          user_id: string
+          role: 'admin' | 'kasir' | 'owner'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          role: 'admin' | 'kasir' | 'owner'
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          role?: 'admin' | 'kasir' | 'owner'
+          updated_at?: string
+        }
+      }
     }
   }
 }
@@ -233,5 +253,44 @@ export type OrderUpdate = Database['public']['Tables']['orders']['Update']
 export type OrderItem = Database['public']['Tables']['order_items']['Row']
 export type OrderItemInsert = Database['public']['Tables']['order_items']['Insert']
 export type Category = Database['public']['Tables']['categories']['Row']
+export type UserRole = Database['public']['Tables']['user_roles']['Row']
+export type UserRoleInsert = Database['public']['Tables']['user_roles']['Insert']
+export type UserRoleUpdate = Database['public']['Tables']['user_roles']['Update']
 
 export type OrderWithItems = Order & { order_items: OrderItem[] }
+
+// Role permissions
+export const ROLE_PERMISSIONS = {
+  owner: {
+    canViewReports: true,
+    canViewProfit: true,
+    canManageProducts: true,
+    canManageSessions: true,
+    canManageOrders: true,
+    canManageUsers: true,
+    canExportData: true,
+    canDeleteOrders: true,
+  },
+  admin: {
+    canViewReports: true,
+    canViewProfit: false,
+    canManageProducts: true,
+    canManageSessions: true,
+    canManageOrders: true,
+    canManageUsers: false,
+    canExportData: true,
+    canDeleteOrders: true,
+  },
+  kasir: {
+    canViewReports: false,
+    canViewProfit: false,
+    canManageProducts: false,
+    canManageSessions: false,
+    canManageOrders: true,
+    canManageUsers: false,
+    canExportData: false,
+    canDeleteOrders: false,
+  },
+} as const
+
+export type UserRoleType = keyof typeof ROLE_PERMISSIONS
