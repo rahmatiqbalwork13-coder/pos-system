@@ -24,7 +24,7 @@ interface InvoicePrintProps {
   format?: 'thermal' | 'a4'
 }
 
-export function InvoicePrint({ order, businessName, businessInfo, format = 'a4' }: InvoicePrintProps) {
+export function InvoicePrint({ order, businessName, businessInfo, format: printFormat = 'a4' }: InvoicePrintProps) {
   const invoiceRef = useRef<HTMLDivElement>(null)
 
   const subtotal = order.order_items.reduce((s, i) => s + i.subtotal_sell, 0)
@@ -38,9 +38,9 @@ export function InvoicePrint({ order, businessName, businessInfo, format = 'a4' 
   }
 
   const handleDownloadPDF = () => {
-    const doc = new jsPDF(format === 'thermal' ? 'p' : 'p', 'mm', format === 'thermal' ? [80, 200] : 'a4')
+    const doc = new jsPDF(printFormat === 'thermal' ? 'p' : 'p', 'mm', printFormat === 'thermal' ? [80, 200] : 'a4')
     
-    if (format === 'thermal') {
+    if (printFormat === 'thermal') {
       // Thermal format
       let y = 10
       doc.setFontSize(14)
@@ -261,12 +261,12 @@ export function InvoicePrint({ order, businessName, businessInfo, format = 'a4' 
       <div 
         ref={invoiceRef}
         className={`bg-white mx-auto shadow-lg ${
-          format === 'thermal' 
+          printFormat === 'thermal' 
             ? 'max-w-[300px] p-4 font-mono text-xs print:w-[80mm]' 
             : 'max-w-[210mm] p-8 print:w-[210mm]'
         }`}
       >
-        {format === 'thermal' ? (
+        {printFormat === 'thermal' ? (
           <ThermalFormat 
             order={order} 
             businessName={businessName} 
