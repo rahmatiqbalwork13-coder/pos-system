@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { Order, OrderItem, PoSession, Product } from '@/lib/supabase/database.types'
+import type { Order, OrderItem, PoSession, Product, Category } from '@/lib/supabase/database.types'
 import {
   formatCurrency, maskPhone, sourceLabel, deliveryLabel,
 } from '@/lib/utils'
@@ -13,6 +13,9 @@ import ReceiptModal from './ReceiptModal'
 import Pagination from '@/components/pagination/Pagination'
 import ExportButtons from '@/components/export/ExportButtons'
 import { usePermission } from '@/hooks/useAuth'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import { useToast } from '@/hooks/useToast'
+import type { PaymentMethodItem } from '../settings/SettingsClient'
 
 type OrderWithItems = Order & { order_items: OrderItem[] }
 
@@ -20,9 +23,11 @@ interface Props {
   initialOrders: OrderWithItems[]
   sessions: PoSession[]
   products: Product[]
+  categories: Category[]
   defaultSessionId?: string
-  paymentMethods: string[]
+  paymentMethods: PaymentMethodItem[]
   businessName: string
+  bankInfo?: string
 }
 
 const PAYMENT_STATUS_COLORS: Record<string, string> = {
@@ -33,7 +38,7 @@ const PAYMENT_STATUS_COLORS: Record<string, string> = {
 
 const ITEMS_PER_PAGE = 10
 
-export default function OrdersClient({ initialOrders, sessions, products, defaultSessionId, paymentMethods, businessName }: Props) {
+export default function OrdersClient({ initialOrders, sessions, products, categories, defaultSessionId, paymentMethods, businessName, bankInfo }: Props) {
   const [orders, setOrders] = useState(initialOrders)
   const [currentPage, setCurrentPage] = useState(1)
   const [showForm, setShowForm] = useState(false)
@@ -44,7 +49,10 @@ export default function OrdersClient({ initialOrders, sessions, products, defaul
   const [filterSession, setFilterSession] = useState(defaultSessionId ?? 'all')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterDelivery] = useState('all')
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null)
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const supabase = createClient()
+  const { toast } = useToast()
 
   // Permission checks
   const canDeleteOrders = usePermission('canDeleteOrders')
@@ -80,24 +88,40 @@ export default function OrdersClient({ initialOrders, sessions, products, defaul
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Hapus pesanan ini?')) return
-    await supabase.from('orders').delete().eq('id', id)
+    const { error } = await supabase.from('orders').delete().eq('id', id)
+    if (error) {
+      toast('Gagal menghapus pesanan. Silakan coba lagi.', 'error')
+      return
+    }
     setOrders(prev => prev.filter(o => o.id !== id))
+    setDeleteTargetId(null)
+    toast('Pesanan berhasil dihapus', 'success')
   }
 
   async function handleQuickStatusChange(order: OrderWithItems, status: Order['payment_status']) {
-    const { data } = await supabase
-      .from('orders')
-      .update({ payment_status: status, updated_at: new Date().toISOString() })
-      .eq('id', order.id)
-      .select('*, order_items(*)')
-      .single()
-    if (data) setOrders(prev => prev.map(o => o.id === data.id ? data as OrderWithItems : o))
+    if (updatingStatusId === order.id) return
+    setUpdatingStatusId(order.id)
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .update({ payment_status: status, updated_at: new Date().toISOString() })
+        .eq('id', order.id)
+        .select('*, order_items(*)')
+        .single()
+      if (error) { toast('Gagal mengubah status pembayaran', 'error'); return }
+      if (data) {
+        setOrders(prev => prev.map(o => o.id === data.id ? data as OrderWithItems : o))
+        toast('Status pembayaran diperbarui', 'success')
+      }
+    } finally {
+      setUpdatingStatusId(null)
+    }
   }
 
   function handleSaved(order: OrderWithItems) {
     setOrders(prev => {
       const exists = prev.find(o => o.id === order.id)
+      toast(exists ? 'Pesanan berhasil diperbarui' : 'Pesanan berhasil ditambahkan', 'success')
       return exists ? prev.map(o => o.id === order.id ? order : o) : [order, ...prev]
     })
     setShowForm(false)
@@ -107,6 +131,7 @@ export default function OrdersClient({ initialOrders, sessions, products, defaul
   function handlePaymentUpdated(order: OrderWithItems) {
     setOrders(prev => prev.map(o => o.id === order.id ? order : o))
     setPaymentOrder(null)
+    toast('Pembayaran berhasil dicatat', 'success')
   }
 
   const activeSession = sessions.find(s => s.status === 'active')
@@ -222,7 +247,8 @@ export default function OrdersClient({ initialOrders, sessions, products, defaul
                   <select
                     value={order.payment_status}
                     onChange={e => handleQuickStatusChange(order, e.target.value as Order['payment_status'])}
-                    className={`px-2 py-1 rounded-lg text-xs font-medium border-0 cursor-pointer ${PAYMENT_STATUS_COLORS[order.payment_status]}`}
+                    disabled={updatingStatusId === order.id}
+                    className={`px-2 py-1 rounded-lg text-xs font-medium border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${PAYMENT_STATUS_COLORS[order.payment_status]}`}
                   >
                     <option value="unpaid">Belum Bayar</option>
                     <option value="dp">DP</option>
@@ -251,7 +277,7 @@ export default function OrdersClient({ initialOrders, sessions, products, defaul
                     </button>
                     {canDeleteOrders && (
                       <button
-                        onClick={() => handleDelete(order.id)}
+                        onClick={() => setDeleteTargetId(order.id)}
                         className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
                       >
                         <Trash2 size={14} />
@@ -280,7 +306,8 @@ export default function OrdersClient({ initialOrders, sessions, products, defaul
               <select
                 value={order.payment_status}
                 onChange={e => handleQuickStatusChange(order, e.target.value as Order['payment_status'])}
-                className={`px-2 py-1 rounded-lg text-xs font-medium border-0 cursor-pointer ${PAYMENT_STATUS_COLORS[order.payment_status]}`}
+                disabled={updatingStatusId === order.id}
+                className={`px-2 py-1 rounded-lg text-xs font-medium border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${PAYMENT_STATUS_COLORS[order.payment_status]}`}
               >
                 <option value="unpaid">Belum Bayar</option>
                 <option value="dp">DP</option>
@@ -325,7 +352,7 @@ export default function OrdersClient({ initialOrders, sessions, products, defaul
               </button>
               {canDeleteOrders && (
                 <button
-                  onClick={() => handleDelete(order.id)}
+                  onClick={() => setDeleteTargetId(order.id)}
                   className="py-2 px-3 bg-red-50 text-red-700 rounded-lg text-xs font-medium"
                 >
                   Hapus
@@ -360,6 +387,7 @@ export default function OrdersClient({ initialOrders, sessions, products, defaul
           order={editOrder}
           sessions={sessions}
           products={products}
+          categories={categories}
           defaultSessionId={filterSession !== 'all' ? filterSession : activeSession?.id}
           onSaved={handleSaved}
           onClose={() => { setShowForm(false); setEditOrder(null) }}
@@ -380,11 +408,20 @@ export default function OrdersClient({ initialOrders, sessions, products, defaul
           order={receiptOrder}
           businessName={businessName}
           businessInfo={{
-            paymentInfo: paymentMethods.join(', ')
+            paymentInfo: bankInfo || paymentMethods.join(', ')
           }}
           onClose={() => setReceiptOrder(null)}
         />
       )}
+
+      <ConfirmDialog
+        open={deleteTargetId !== null}
+        title="Hapus Pesanan?"
+        description="Pesanan yang dihapus tidak bisa dikembalikan."
+        confirmLabel="Ya, Hapus"
+        onConfirm={() => deleteTargetId && handleDelete(deleteTargetId)}
+        onCancel={() => setDeleteTargetId(null)}
+      />
     </div>
   )
 }

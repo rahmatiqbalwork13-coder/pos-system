@@ -9,6 +9,8 @@ import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 import Link from 'next/link'
 import SessionForm from './SessionForm'
+import { useToast } from '@/hooks/useToast'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
 
 interface Props { initialSessions: PoSession[] }
 
@@ -23,27 +25,55 @@ export default function SessionsClient({ initialSessions }: Props) {
   const [sessions, setSessions] = useState(initialSessions)
   const [showForm, setShowForm] = useState(false)
   const [editSession, setEditSession] = useState<PoSession | null>(null)
+  const [closeWarningSession, setCloseWarningSession] = useState<PoSession | null>(null)
+  const [unpaidCount, setUnpaidCount] = useState(0)
   const supabase = createClient()
 
   const activeSession = sessions.find(s => s.status === 'active')
+  const { toast } = useToast()
+
+  const SESSION_STATUS_LABELS: Record<string, string> = {
+    active: 'diaktifkan', closed: 'ditutup', done: 'ditandai selesai', draft: 'dikembalikan ke draft',
+  }
 
   async function handleStatusChange(session: PoSession, newStatus: PoSession['status']) {
     if (newStatus === 'active' && activeSession && activeSession.id !== session.id) {
-      alert('Sudah ada sesi yang aktif. Tutup sesi aktif terlebih dahulu.')
+      toast('Sudah ada sesi yang aktif. Tutup sesi aktif terlebih dahulu.', 'warning')
       return
     }
-    const { data } = await supabase
+    if (newStatus === 'closed') {
+      const { count } = await supabase
+        .from('orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('session_id', session.id)
+        .neq('payment_status', 'paid')
+      if (count && count > 0) {
+        setUnpaidCount(count)
+        setCloseWarningSession(session)
+        return
+      }
+    }
+    await doStatusChange(session, newStatus)
+  }
+
+  async function doStatusChange(session: PoSession, newStatus: PoSession['status']) {
+    const { data, error } = await supabase
       .from('po_sessions')
       .update({ status: newStatus })
       .eq('id', session.id)
       .select()
       .single()
-    if (data) setSessions(prev => prev.map(s => s.id === data.id ? data : s))
+    if (error) { toast('Gagal mengubah status sesi', 'error'); return }
+    if (data) {
+      setSessions(prev => prev.map(s => s.id === data.id ? data : s))
+      toast(`Sesi berhasil ${SESSION_STATUS_LABELS[newStatus] ?? 'diperbarui'}`, 'success')
+    }
   }
 
   function handleSaved(session: PoSession) {
     setSessions(prev => {
       const exists = prev.find(s => s.id === session.id)
+      toast(exists ? 'Sesi berhasil diperbarui' : 'Sesi PO berhasil dibuat', 'success')
       return exists ? prev.map(s => s.id === session.id ? session : s) : [session, ...prev]
     })
     setShowForm(false)
@@ -192,6 +222,19 @@ export default function SessionsClient({ initialSessions }: Props) {
           onClose={() => { setShowForm(false); setEditSession(null) }}
         />
       )}
+
+      <ConfirmDialog
+        open={closeWarningSession !== null}
+        title="Ada Pesanan Belum Lunas"
+        description={`Terdapat ${unpaidCount} pesanan yang belum lunas di sesi ini. Tutup sesi sekarang?`}
+        confirmLabel="Tutup Tetap"
+        destructive={false}
+        onConfirm={() => {
+          if (closeWarningSession) doStatusChange(closeWarningSession, 'closed')
+          setCloseWarningSession(null)
+        }}
+        onCancel={() => setCloseWarningSession(null)}
+      />
     </div>
   )
 }

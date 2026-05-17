@@ -3,21 +3,33 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Category } from '@/lib/supabase/database.types'
-import { Plus, Trash2, X } from 'lucide-react'
+import { Plus, Trash2, X, Save } from 'lucide-react'
+import { useToast } from '@/hooks/useToast'
+
+export type PaymentMethodItem = { name: string; info: string }
 
 interface Props {
   initialCategories: Category[]
-  initialPaymentMethods: string[]
+  initialPaymentMethods: PaymentMethodItem[]
+  initialBusinessName: string
+  initialBankInfo: string
+  initialBusinessWa: string
 }
 
-export default function SettingsClient({ initialCategories, initialPaymentMethods }: Props) {
-  const [activeTab, setActiveTab] = useState<'categories' | 'payment'>('categories')
+export default function SettingsClient({ initialCategories, initialPaymentMethods, initialBusinessName, initialBankInfo, initialBusinessWa }: Props) {
+  const [activeTab, setActiveTab] = useState<'categories' | 'payment' | 'business'>('categories')
   const [categories, setCategories] = useState(initialCategories)
-  const [paymentMethods, setPaymentMethods] = useState(initialPaymentMethods)
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodItem[]>(initialPaymentMethods)
   const [newCategory, setNewCategory] = useState('')
-  const [newPayment, setNewPayment] = useState('')
+  const [newName, setNewName] = useState('')
+  const [newInfo, setNewInfo] = useState('')
   const [loading, setLoading] = useState(false)
+  const [businessName, setBusinessName] = useState(initialBusinessName)
+  const [bankInfo, setBankInfo] = useState(initialBankInfo)
+  const [businessWa, setBusinessWa] = useState(initialBusinessWa)
+  const [savingBusiness, setSavingBusiness] = useState(false)
   const supabase = createClient()
+  const { toast } = useToast()
 
   async function addCategory() {
     const name = newCategory.trim()
@@ -32,6 +44,9 @@ export default function SettingsClient({ initialCategories, initialPaymentMethod
     if (!error && data) {
       setCategories(prev => [...prev, data])
       setNewCategory('')
+      toast('Kategori berhasil ditambahkan', 'success')
+    } else if (error) {
+      toast('Gagal menambahkan kategori', 'error')
     }
     setLoading(false)
   }
@@ -47,12 +62,12 @@ export default function SettingsClient({ initialCategories, initialPaymentMethod
   }
 
   async function deleteCategory(id: string) {
-    if (!confirm('Hapus kategori ini? Produk yang sudah ada tidak terpengaruh.')) return
     await supabase.from('categories').delete().eq('id', id)
     setCategories(prev => prev.filter(c => c.id !== id))
+    toast('Kategori berhasil dihapus', 'success')
   }
 
-  async function savePaymentMethods(methods: string[]) {
+  async function savePaymentMethods(methods: PaymentMethodItem[]) {
     await supabase.from('settings').upsert({
       key: 'payment_methods',
       value: JSON.stringify(methods),
@@ -60,19 +75,46 @@ export default function SettingsClient({ initialCategories, initialPaymentMethod
     })
   }
 
-  async function addPayment() {
-    const name = newPayment.trim()
-    if (!name || paymentMethods.includes(name)) return
-    const updated = [...paymentMethods, name]
-    setPaymentMethods(updated)
-    setNewPayment('')
-    await savePaymentMethods(updated)
+  async function saveBusinessInfo() {
+    setSavingBusiness(true)
+    const entries = [
+      { key: 'business_name', value: businessName.trim() || 'Open PO Management' },
+      { key: 'bank_info', value: bankInfo.trim() },
+      { key: 'business_wa', value: businessWa.trim() },
+    ]
+    const { error } = await supabase.from('settings').upsert(
+      entries.map(e => ({ ...e, updated_at: new Date().toISOString() }))
+    )
+    setSavingBusiness(false)
+    if (error) { toast('Gagal menyimpan info bisnis', 'error'); return }
+    toast('Info bisnis berhasil disimpan', 'success')
   }
 
-  async function removePayment(method: string) {
-    const updated = paymentMethods.filter(m => m !== method)
+  async function addPayment() {
+    const name = newName.trim()
+    if (!name || paymentMethods.some(m => m.name === name)) return
+    const updated = [...paymentMethods, { name, info: newInfo.trim() }]
+    setPaymentMethods(updated)
+    setNewName('')
+    setNewInfo('')
+    await savePaymentMethods(updated)
+    toast('Metode pembayaran ditambahkan', 'success')
+  }
+
+  async function updatePaymentInfo(index: number, info: string) {
+    const current = paymentMethods[index]
+    if (current.info === info) return
+    const updated = paymentMethods.map((m, i) => i === index ? { ...m, info } : m)
     setPaymentMethods(updated)
     await savePaymentMethods(updated)
+    toast('Info rekening disimpan', 'success')
+  }
+
+  async function removePayment(name: string) {
+    const updated = paymentMethods.filter(m => m.name !== name)
+    setPaymentMethods(updated)
+    await savePaymentMethods(updated)
+    toast('Metode pembayaran dihapus', 'success')
   }
 
   return (
@@ -84,11 +126,11 @@ export default function SettingsClient({ initialCategories, initialPaymentMethod
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-xl">
-        {([['categories', 'Kategori Produk'], ['payment', 'Metode Pembayaran']] as const).map(([tab, label]) => (
+        {([['categories', 'Kategori'], ['payment', 'Pembayaran'], ['business', 'Info Bisnis']] as const).map(([tab, label]) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+            className={`flex-1 py-2 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
               activeTab === tab ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'
             }`}
           >
@@ -152,39 +194,116 @@ export default function SettingsClient({ initialCategories, initialPaymentMethod
       {/* Payment Methods */}
       {activeTab === 'payment' && (
         <div className="space-y-4">
-          <div className="flex gap-2">
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700">
+            Tambahkan metode pembayaran beserta nomor rekening/akun. Info rekening akan muncul di struk.
+          </div>
+
+          {/* Add new method */}
+          <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-2">
+            <p className="text-xs font-medium text-gray-600 mb-3">Tambah Metode Baru</p>
             <input
-              value={newPayment}
-              onChange={e => setNewPayment(e.target.value)}
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && addPayment()}
-              placeholder="Nama metode pembayaran baru..."
-              className="flex-1 px-3 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+              placeholder="Nama metode, misal: GoPay, Transfer BCA, Cash"
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+            />
+            <input
+              value={newInfo}
+              onChange={e => setNewInfo(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addPayment()}
+              placeholder="Nomor rekening/akun (opsional), misal: 081234567890"
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
             <button
               onClick={addPayment}
-              disabled={!newPayment.trim()}
-              className="px-4 py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white rounded-xl text-sm font-medium transition-colors"
+              disabled={!newName.trim()}
+              className="flex items-center gap-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white rounded-xl text-sm font-medium transition-colors"
             >
-              <Plus size={16} />
+              <Plus size={15} /> Tambah
             </button>
           </div>
 
+          {/* Existing methods */}
           <div className="space-y-2">
             {paymentMethods.length === 0 && (
               <p className="text-center text-gray-400 py-8 text-sm">Belum ada metode pembayaran</p>
             )}
-            {paymentMethods.map(method => (
-              <div key={method} className="flex items-center gap-3 bg-white p-3 rounded-xl border border-gray-100">
-                <p className="flex-1 text-sm text-gray-900">{method}</p>
-                <button
-                  onClick={() => removePayment(method)}
-                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                >
-                  <X size={14} />
-                </button>
+            {paymentMethods.map((method, i) => (
+              <div key={method.name} className="bg-white rounded-xl border border-gray-100 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-semibold text-gray-900">{method.name}</p>
+                  <button
+                    onClick={() => removePayment(method.name)}
+                    className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <input
+                  key={`${method.name}-info`}
+                  defaultValue={method.info}
+                  placeholder="Nomor rekening / akun (opsional)"
+                  onBlur={e => updatePaymentInfo(i, e.target.value.trim())}
+                  className="w-full px-2.5 py-2 border border-gray-100 bg-gray-50 rounded-lg text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:bg-white transition-colors"
+                />
+                {method.info && (
+                  <p className="text-xs text-green-600 mt-1 ml-0.5">✓ {method.info}</p>
+                )}
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Business Info */}
+      {activeTab === 'business' && (
+        <div className="space-y-4">
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700">
+            Info ini ditampilkan di struk/invoice dan digunakan di tombol WhatsApp.
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Nama Toko</label>
+            <input
+              value={businessName}
+              onChange={e => setBusinessName(e.target.value)}
+              placeholder="Contoh: Open PO Kebab Sari"
+              className="w-full px-3 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Nomor WhatsApp Toko</label>
+            <input
+              value={businessWa}
+              onChange={e => setBusinessWa(e.target.value)}
+              placeholder="Contoh: 6281234567890 (tanpa tanda +)"
+              className="w-full px-3 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+            />
+            <p className="text-xs text-gray-400 mt-1">Format internasional tanpa +, misal: 6281234567890</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Info Rekening / Pembayaran</label>
+            <textarea
+              value={bankInfo}
+              onChange={e => setBankInfo(e.target.value)}
+              placeholder="Contoh: BCA 1234567890 a/n Sari&#10;GoPay/OVO/Dana: 081234567890"
+              rows={4}
+              className="w-full px-3 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
+            />
+            <p className="text-xs text-gray-400 mt-1">Ditampilkan di bagian bawah struk/invoice</p>
+          </div>
+
+          <button
+            onClick={saveBusinessInfo}
+            disabled={savingBusiness}
+            className="flex items-center gap-2 px-5 py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white rounded-xl text-sm font-medium transition-colors"
+          >
+            <Save size={16} />
+            {savingBusiness ? 'Menyimpan...' : 'Simpan Info Bisnis'}
+          </button>
         </div>
       )}
     </div>

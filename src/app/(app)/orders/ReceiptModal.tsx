@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import type { Order, OrderItem } from '@/lib/supabase/database.types'
 import { formatCurrency, deliveryLabel, paymentStatusLabel, sourceLabel } from '@/lib/utils'
 import { X, Printer, MessageCircle, Download, Check, Copy } from 'lucide-react'
+import ModalWrapper from '@/components/ui/ModalWrapper'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 
@@ -113,9 +114,27 @@ export default function ReceiptModal({ order, businessName, businessInfo, onClos
   }
 
   function handleDownloadPDF() {
-    // This would require a PDF library like jsPDF or html2pdf
-    // For now, we'll use the print to PDF feature of the browser
-    handlePrint()
+    const content = receiptRef.current?.innerHTML ?? ''
+    const isThermal = printFormat === 'thermal'
+    const win = window.open('', '_blank', 'width=400,height=700')
+    if (!win) return
+    win.document.write(`<!DOCTYPE html><html><head><title>Struk Pembayaran</title>
+      <meta charset="UTF-8">
+      <style>
+        @page { size: ${isThermal ? '80mm auto' : 'A4'}; margin: ${isThermal ? '0' : '20mm'}; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: ${isThermal ? "'Courier New', monospace" : 'system-ui, -apple-system, sans-serif'}; font-size: ${isThermal ? '12px' : '14px'}; padding: ${isThermal ? '8px' : '0'}; max-width: ${isThermal ? '80mm' : '210mm'}; margin: 0 auto; background: white; }
+        .text-center{text-align:center}.text-right{text-align:right}.font-bold{font-weight:bold}.text-lg{font-size:${isThermal ? '14px' : '18px'}}.text-sm{font-size:${isThermal ? '11px' : '13px'}}.text-xs{font-size:${isThermal ? '10px' : '11px'}}.text-gray{color:#666}.border-t{border-top:${isThermal ? '1px dashed #ccc' : '1px solid #e5e7eb'}}.border-b{border-bottom:${isThermal ? '1px dashed #ccc' : '1px solid #e5e7eb'}}.mt-2{margin-top:8px}.mt-3{margin-top:12px}.mb-2{margin-bottom:8px}.mb-3{margin-bottom:12px}.p-2{padding:8px}.flex{display:flex}.justify-between{justify-content:space-between}.items-center{align-items:center}.gap-2{gap:8px}.w-full{width:100%}.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+        .thermal-header{text-align:center;margin-bottom:12px}.thermal-header h1{font-size:16px;font-weight:bold;margin-bottom:4px}.thermal-divider{border-top:1px dashed #999;margin:8px 0}.thermal-total{font-size:14px;font-weight:bold;border-top:2px solid #333;border-bottom:2px solid #333;padding:8px 0;margin:8px 0}
+        .a4-header{border-bottom:2px solid #f97316;padding-bottom:16px;margin-bottom:24px}.a4-logo{font-size:24px;font-weight:bold;color:#f97316}.a4-title{font-size:24px;font-weight:bold;margin-top:8px}.a4-section{margin-bottom:24px}.a4-section-title{font-size:12px;text-transform:uppercase;color:#666;margin-bottom:8px;letter-spacing:0.5px}.a4-table{width:100%;border-collapse:collapse}.a4-table th{text-align:left;padding:12px 8px;background:#f9fafb;border-bottom:2px solid #e5e7eb;font-size:12px;text-transform:uppercase;color:#666}.a4-table td{padding:12px 8px;border-bottom:1px solid #e5e7eb}.a4-total-box{background:#f9fafb;padding:16px;border-radius:8px;margin-top:24px}
+        .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-weight:600;font-size:10px}.badge-paid{background:#dcfce7;color:#15803d}.badge-dp{background:#fef9c3;color:#a16207}.badge-unpaid{background:#fee2e2;color:#b91c1c}
+        @media print { body{print-color-adjust:exact;-webkit-print-color-adjust:exact} }
+      </style>
+    </head><body>${content}</body></html>`)
+    win.document.close()
+    win.focus()
+    // Trigger Save as PDF via browser print dialog (Ctrl+P → Save as PDF)
+    setTimeout(() => { win.print() }, 300)
   }
 
   async function handleCopyText() {
@@ -208,8 +227,8 @@ export default function ReceiptModal({ order, businessName, businessInfo, onClos
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50 p-0 md:p-4">
-      <div className="bg-white w-full md:max-w-2xl rounded-t-2xl md:rounded-2xl max-h-[95vh] overflow-hidden flex flex-col">
+    <ModalWrapper onClose={onClose} maxWidth="md:max-w-2xl" fullHeight>
+      <div className="flex flex-col max-h-[95vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center gap-4">
@@ -513,9 +532,10 @@ export default function ReceiptModal({ order, businessName, businessInfo, onClos
           <button
             onClick={handleDownloadPDF}
             className="flex items-center justify-center gap-2 py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-medium transition-colors"
+            title="Buka di tab baru lalu pilih 'Save as PDF' di dialog print"
           >
             <Download size={16} />
-            PDF
+            Simpan PDF
           </button>
           <button
             onClick={handlePrint}
@@ -526,6 +546,6 @@ export default function ReceiptModal({ order, businessName, businessInfo, onClos
           </button>
         </div>
       </div>
-    </div>
+    </ModalWrapper>
   )
 }

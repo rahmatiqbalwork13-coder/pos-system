@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { Order, OrderItem, PoSession, Product } from '@/lib/supabase/database.types'
+import type { Order, OrderItem, PoSession, Product, Category } from '@/lib/supabase/database.types'
 import { formatCurrency, categoryLabel } from '@/lib/utils'
 import { X, Plus, Minus } from 'lucide-react'
+import ModalWrapper from '@/components/ui/ModalWrapper'
 
 type OrderWithItems = Order & { order_items: OrderItem[] }
 
@@ -17,12 +18,13 @@ interface Props {
   order: OrderWithItems | null
   sessions: PoSession[]
   products: Product[]
+  categories?: Category[]
   defaultSessionId?: string
   onSaved: (order: OrderWithItems) => void
   onClose: () => void
 }
 
-export default function OrderForm({ order, sessions, products, defaultSessionId, onSaved, onClose }: Props) {
+export default function OrderForm({ order, sessions, products, categories, defaultSessionId, onSaved, onClose }: Props) {
   const [sessionId, setSessionId] = useState(order?.session_id ?? defaultSessionId ?? '')
   const [customerName, setCustomerName] = useState(order?.customer_name ?? '')
   const [customerPhone, setCustomerPhone] = useState(order?.customer_phone ?? '')
@@ -77,6 +79,10 @@ export default function OrderForm({ order, sessions, products, defaultSessionId,
     if (!sessionId) return setError('Pilih sesi PO terlebih dahulu')
     if (!customerName.trim()) return setError('Nama customer wajib diisi')
     if (!customerPhone.trim()) return setError('Nomor HP wajib diisi')
+    const phoneClean = customerPhone.replace(/\s+/g, '')
+    if (!/^(08|628|\+628)\d{7,11}$/.test(phoneClean)) {
+      return setError('Nomor HP tidak valid. Contoh: 08123456789 atau 628123456789')
+    }
     if (cart.length === 0) return setError('Tambahkan minimal 1 produk')
     setLoading(true)
     setError('')
@@ -99,31 +105,46 @@ export default function OrderForm({ order, sessions, products, defaultSessionId,
       let orderId = order?.id
       if (order) {
         const { error: updateError } = await supabase.from('orders').update(orderPayload).eq('id', order.id)
-        if (updateError) {
-          throw new Error(updateError.message)
+        if (updateError) throw new Error(updateError.message)
+
+        // Capture old item IDs before touching anything to avoid data loss on failure
+        const oldItemIds = order.order_items.map(i => i.id)
+
+        // Insert new items first — if this fails, old items remain untouched
+        const newItems = cart.map(item => ({
+          order_id: order.id,
+          product_id: item.product.id,
+          product_name: item.product.name,
+          buy_price: item.product.current_buy_price,
+          sell_price: item.product.current_sell_price,
+          quantity: item.quantity,
+        }))
+        const { error: insertError } = await supabase.from('order_items').insert(newItems)
+        if (insertError) throw new Error(insertError.message)
+
+        // Safe to delete old items now that new ones are committed
+        if (oldItemIds.length > 0) {
+          await supabase.from('order_items').delete().in('id', oldItemIds)
         }
-        await supabase.from('order_items').delete().eq('order_id', order.id)
       } else {
         const { data, error: err } = await supabase
           .from('orders')
           .insert({ ...orderPayload, payment_status: 'unpaid', amount_paid: 0 })
           .select()
           .single()
-        if (err) { throw new Error(err.message) }
+        if (err) throw new Error(err.message)
         orderId = data.id
-      }
 
-      const items = cart.map(item => ({
-        order_id: orderId!,
-        product_id: item.product.id,
-        product_name: item.product.name,
-        buy_price: item.product.current_buy_price,
-        sell_price: item.product.current_sell_price,
-        quantity: item.quantity,
-      }))
-      const { error: itemsError } = await supabase.from('order_items').insert(items)
-      if (itemsError) {
-        throw new Error(itemsError.message)
+        const items = cart.map(item => ({
+          order_id: orderId!,
+          product_id: item.product.id,
+          product_name: item.product.name,
+          buy_price: item.product.current_buy_price,
+          sell_price: item.product.current_sell_price,
+          quantity: item.quantity,
+        }))
+        const { error: itemsError } = await supabase.from('order_items').insert(items)
+        if (itemsError) throw new Error(itemsError.message)
       }
 
       const { data: saved, error: fetchError } = await supabase
@@ -148,8 +169,8 @@ export default function OrderForm({ order, sessions, products, defaultSessionId,
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50 p-0 md:p-4">
-      <div className="bg-white w-full md:max-w-2xl rounded-t-2xl md:rounded-2xl max-h-[95vh] flex flex-col">
+    <ModalWrapper onClose={onClose} maxWidth="md:max-w-2xl" fullHeight>
+      <div className="flex flex-col max-h-[95vh]">
         <div className="flex items-center justify-between p-5 border-b border-gray-100 flex-shrink-0">
           <h2 className="font-semibold text-gray-900">{order ? 'Edit Pesanan' : 'Input Pesanan Baru'}</h2>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600"><X size={20} /></button>
@@ -226,7 +247,7 @@ export default function OrderForm({ order, sessions, products, defaultSessionId,
                     className="text-left p-3 border border-gray-200 rounded-xl hover:border-orange-300 hover:bg-orange-50 transition-colors"
                   >
                     <p className="text-xs font-medium text-gray-900 leading-tight">{product.name}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{categoryLabel(product.category)}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{categoryLabel(product.category, categories)}</p>
                     <p className="text-xs font-semibold text-orange-600 mt-1">{formatCurrency(product.current_sell_price)}</p>
                   </button>
                 ))}
@@ -361,6 +382,6 @@ export default function OrderForm({ order, sessions, products, defaultSessionId,
           </div>
         </form>
       </div>
-    </div>
+    </ModalWrapper>
   )
 }

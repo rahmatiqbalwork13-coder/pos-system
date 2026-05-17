@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { PoSession } from '@/lib/supabase/database.types'
 import { X } from 'lucide-react'
+import ModalWrapper from '@/components/ui/ModalWrapper'
 
 interface Props {
   session: PoSession | null
@@ -25,6 +26,8 @@ export default function SessionForm({ session, onSaved, onClose }: Props) {
     e.preventDefault()
     if (!name.trim()) return setError('Nama sesi wajib diisi')
     if (!closeDate) return setError('Tanggal tutup wajib diisi')
+    if (closeDate <= openDate) return setError('Tanggal tutup harus setelah tanggal buka')
+    if (pickupDate && pickupDate < closeDate) return setError('Tanggal pickup harus sama atau setelah tanggal tutup')
     setLoading(true)
     setError('')
     const supabase = createClient()
@@ -57,8 +60,8 @@ export default function SessionForm({ session, onSaved, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50 p-0 md:p-4">
-      <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-2xl max-h-[90vh] overflow-y-auto">
+    <ModalWrapper onClose={onClose} maxWidth="md:max-w-md">
+      <div className="overflow-y-auto">
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">{session ? 'Edit Sesi PO' : 'Buat Sesi PO Baru'}</h2>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600"><X size={20} /></button>
@@ -144,6 +147,6 @@ export default function SessionForm({ session, onSaved, onClose }: Props) {
           </div>
         </form>
       </div>
-    </div>
+    </ModalWrapper>
   )
 }

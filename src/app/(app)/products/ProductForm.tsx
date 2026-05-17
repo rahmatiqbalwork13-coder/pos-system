@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { Product, Category } from '@/lib/supabase/database.types'
 import { calcMargin } from '@/lib/utils'
 import { X, AlertTriangle } from 'lucide-react'
+import ModalWrapper from '@/components/ui/ModalWrapper'
 
 interface Props {
   product: Product | null
@@ -95,8 +96,8 @@ export default function ProductForm({ product, categories, onSaved, onClose }: P
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50 p-0 md:p-4">
-      <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-2xl max-h-[90vh] overflow-y-auto">
+    <ModalWrapper onClose={onClose} maxWidth="md:max-w-md">
+      <div className="overflow-y-auto">
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">{product ? 'Edit Produk' : 'Tambah Produk'}</h2>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600">
@@ -200,6 +201,6 @@ export default function ProductForm({ product, categories, onSaved, onClose }: P
           </div>
         </form>
       </div>
-    </div>
+    </ModalWrapper>
   )
 }

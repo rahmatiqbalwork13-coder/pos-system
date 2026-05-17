@@ -1,5 +1,17 @@
 import { createClient } from '@/lib/supabase/server'
-import SettingsClient from './SettingsClient'
+import SettingsClient, { type PaymentMethodItem } from './SettingsClient'
+
+const DEFAULT_METHODS = ['Cash', 'Transfer BCA', 'Transfer BRI', 'GoPay', 'OVO', 'DANA', 'ShopeePay']
+
+function parsePaymentMethods(raw: string | undefined): PaymentMethodItem[] {
+  if (!raw) return DEFAULT_METHODS.map(name => ({ name, info: '' }))
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed) || parsed.length === 0) return []
+    if (typeof parsed[0] === 'string') return parsed.map((name: string) => ({ name, info: '' }))
+    return parsed as PaymentMethodItem[]
+  } catch { return [] }
+}
 
 export default async function SettingsPage() {
   const supabase = await createClient()
@@ -9,15 +21,18 @@ export default async function SettingsPage() {
     supabase.from('settings').select('*'),
   ])
 
-  const paymentMethodsSetting = settings?.find(s => s.key === 'payment_methods')
-  const paymentMethods: string[] = paymentMethodsSetting
-    ? JSON.parse(paymentMethodsSetting.value)
-    : ['Cash', 'Transfer BCA', 'Transfer BRI', 'GoPay', 'OVO', 'DANA', 'ShopeePay']
+  const paymentMethods = parsePaymentMethods(settings?.find(s => s.key === 'payment_methods')?.value)
+  const businessName = settings?.find(s => s.key === 'business_name')?.value ?? 'Open PO Management'
+  const bankInfo = settings?.find(s => s.key === 'bank_info')?.value ?? ''
+  const businessWa = settings?.find(s => s.key === 'business_wa')?.value ?? ''
 
   return (
     <SettingsClient
       initialCategories={categories ?? []}
       initialPaymentMethods={paymentMethods}
+      initialBusinessName={businessName}
+      initialBankInfo={bankInfo}
+      initialBusinessWa={businessWa}
     />
   )
 }

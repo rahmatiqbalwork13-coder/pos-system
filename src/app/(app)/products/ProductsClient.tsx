@@ -4,9 +4,11 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Product, Category } from '@/lib/supabase/database.types'
 import { formatCurrency, calcMargin, categoryLabel } from '@/lib/utils'
-import { Plus, Edit2, Trash2, History } from 'lucide-react'
+import { Plus, Edit2, Trash2, History, Search, X } from 'lucide-react'
 import ProductForm from './ProductForm'
 import PriceHistoryModal from './PriceHistoryModal'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import { useToast } from '@/hooks/useToast'
 
 interface Props {
   initialProducts: Product[]
@@ -21,34 +23,58 @@ export default function ProductsClient({ initialProducts, initialCategories }: P
   const [historyProductId, setHistoryProductId] = useState<string | null>(null)
   const [filterCategory, setFilterCategory] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [search, setSearch] = useState('')
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const supabase = createClient()
+  const { toast } = useToast()
 
   const filtered = products.filter(p => {
     if (filterCategory !== 'all' && p.category !== filterCategory) return false
     if (filterStatus === 'active' && !p.is_active) return false
     if (filterStatus === 'inactive' && p.is_active) return false
+    if (search) {
+      const q = search.toLowerCase()
+      if (!p.name.toLowerCase().includes(q)) return false
+    }
     return true
   })
 
   async function handleDelete(id: string) {
-    if (!confirm('Hapus produk ini?')) return
-    await supabase.from('products').delete().eq('id', id)
+    const { error } = await supabase.from('products').delete().eq('id', id)
+    if (error) {
+      toast('Gagal menghapus produk. Silakan coba lagi.', 'error')
+      return
+    }
     setProducts(prev => prev.filter(p => p.id !== id))
+    setDeleteTargetId(null)
+    toast('Produk berhasil dihapus', 'success')
   }
 
   async function handleToggleActive(product: Product) {
-    const { data } = await supabase
-      .from('products')
-      .update({ is_active: !product.is_active })
-      .eq('id', product.id)
-      .select()
-      .single()
-    if (data) setProducts(prev => prev.map(p => p.id === data.id ? data : p))
+    if (togglingId === product.id) return
+    setTogglingId(product.id)
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .update({ is_active: !product.is_active })
+        .eq('id', product.id)
+        .select()
+        .single()
+      if (error) { toast('Gagal mengubah status produk', 'error'); return }
+      if (data) {
+        setProducts(prev => prev.map(p => p.id === data.id ? data : p))
+        toast(`Produk ${data.is_active ? 'diaktifkan' : 'dinonaktifkan'}`, 'success')
+      }
+    } finally {
+      setTogglingId(null)
+    }
   }
 
   function handleSaved(product: Product) {
     setProducts(prev => {
       const exists = prev.find(p => p.id === product.id)
+      toast(exists ? 'Produk berhasil diperbarui' : 'Produk berhasil ditambahkan', 'success')
       return exists ? prev.map(p => p.id === product.id ? product : p) : [product, ...prev]
     })
     setShowForm(false)
@@ -71,6 +97,22 @@ export default function ProductsClient({ initialProducts, initialCategories }: P
           <span className="hidden sm:inline">Tambah Produk</span>
           <span className="sm:hidden">Tambah</span>
         </button>
+      </div>
+
+      {/* Search */}
+      <div className="relative mb-3">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="w-full pl-9 pr-9 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+          placeholder="Cari nama produk..."
+        />
+        {search && (
+          <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+            <X size={15} />
+          </button>
+        )}
       </div>
 
       {/* Filters */}
@@ -132,7 +174,7 @@ export default function ProductsClient({ initialProducts, initialCategories }: P
               return (
                 <tr key={product.id} className="hover:bg-gray-50/50">
                   <td className="px-4 py-3 font-medium text-gray-900">{product.name}</td>
-                  <td className="px-4 py-3 text-gray-600">{categoryLabel(product.category)}</td>
+                  <td className="px-4 py-3 text-gray-600">{categoryLabel(product.category, categories)}</td>
                   <td className="px-4 py-3 text-right text-gray-600">{formatCurrency(product.current_buy_price)}</td>
                   <td className="px-4 py-3 text-right font-medium">{formatCurrency(product.current_sell_price)}</td>
                   <td className="px-4 py-3 text-right">
@@ -144,11 +186,12 @@ export default function ProductsClient({ initialProducts, initialCategories }: P
                   <td className="px-4 py-3 text-center">
                     <button
                       onClick={() => handleToggleActive(product)}
-                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      disabled={togglingId === product.id}
+                      className={`px-2 py-0.5 rounded-full text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
                         product.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
                       }`}
                     >
-                      {product.is_active ? 'Aktif' : 'Nonaktif'}
+                      {togglingId === product.id ? '...' : product.is_active ? 'Aktif' : 'Nonaktif'}
                     </button>
                   </td>
                   <td className="px-4 py-3">
@@ -167,7 +210,7 @@ export default function ProductsClient({ initialProducts, initialCategories }: P
                         <Edit2 size={15} />
                       </button>
                       <button
-                        onClick={() => handleDelete(product.id)}
+                        onClick={() => setDeleteTargetId(product.id)}
                         className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                       >
                         <Trash2 size={15} />
@@ -194,11 +237,12 @@ export default function ProductsClient({ initialProducts, initialCategories }: P
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <p className="font-medium text-gray-900">{product.name}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{categoryLabel(product.category)}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{categoryLabel(product.category, categories)}</p>
                 </div>
                 <button
                   onClick={() => handleToggleActive(product)}
-                  className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                  disabled={togglingId === product.id}
+                  className={`px-2 py-0.5 rounded-full text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed ${
                     product.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
                   }`}
                 >
@@ -235,7 +279,7 @@ export default function ProductsClient({ initialProducts, initialCategories }: P
                   <Edit2 size={13} /> Edit
                 </button>
                 <button
-                  onClick={() => handleDelete(product.id)}
+                  onClick={() => setDeleteTargetId(product.id)}
                   className="flex items-center gap-1 text-xs text-red-600 bg-red-50 px-3 py-1.5 rounded-lg"
                 >
                   <Trash2 size={13} /> Hapus
@@ -272,6 +316,15 @@ export default function ProductsClient({ initialProducts, initialCategories }: P
           onClose={() => setHistoryProductId(null)}
         />
       )}
+
+      <ConfirmDialog
+        open={deleteTargetId !== null}
+        title="Hapus Produk?"
+        description="Produk yang dihapus tidak bisa dikembalikan."
+        confirmLabel="Ya, Hapus"
+        onConfirm={() => deleteTargetId && handleDelete(deleteTargetId)}
+        onCancel={() => setDeleteTargetId(null)}
+      />
     </div>
   )
 }

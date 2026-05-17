@@ -29,7 +29,11 @@ export function calcMargin(buyPrice: number, sellPrice: number) {
   return { marginRp, marginPct }
 }
 
-export function categoryLabel(cat: string): string {
+export function categoryLabel(cat: string, dynamicCategories?: { slug: string; name: string }[]): string {
+  if (dynamicCategories) {
+    const found = dynamicCategories.find(c => c.slug === cat)
+    if (found) return found.name
+  }
   const map: Record<string, string> = {
     kebab: 'Kebab',
     roti_maryam: 'Roti Maryam',

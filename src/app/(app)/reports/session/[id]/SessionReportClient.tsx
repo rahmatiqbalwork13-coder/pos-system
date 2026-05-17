@@ -285,7 +285,7 @@ export default function SessionReportClient({ session, orders }: Props) {
                   {canViewProfit && (
                     <>
                       <td className="px-4 py-3 text-right text-gray-600">{formatCurrency(totalCogs)}</td>
-                      <td className="px-5 py-3 text-right text-green-600">{formatCurrency(grossProfit + sellerDeliveryCost)}</td>
+                      <td className="px-5 py-3 text-right text-green-600">{formatCurrency(grossProfit)}</td>
                       <td className="px-5 py-3 text-right"></td>
                     </>
                   )}

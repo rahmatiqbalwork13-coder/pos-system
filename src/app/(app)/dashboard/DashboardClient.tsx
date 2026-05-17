@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import type { PoSession, Order, OrderItem, Product } from '@/lib/supabase/database.types'
 import { formatCurrency, calcMargin } from '@/lib/utils'
-import { ShoppingBag, Users, Wallet, TrendingUp, ChevronRight, AlertTriangle, Plus } from 'lucide-react'
+import { ShoppingBag, Users, Wallet, TrendingUp, ChevronRight, AlertTriangle, Plus, ClipboardList, Package, CalendarRange, BarChart3 } from 'lucide-react'
 import { format } from 'date-fns'
 import { id } from 'date-fns/locale'
 
@@ -33,7 +33,7 @@ export default function DashboardClient({ activeSession, activeOrders, allOrders
     return subtotal + ongkir
   }
 
-  const totalRevenue = activeOrders.reduce((s, o) => s + calcOrderTotal(o), 0)
+  const totalRevenue = displayOrders.reduce((s, o) => s + calcOrderTotal(o), 0)
   const totalPaid = paidOrders.reduce((s, o) => s + calcOrderTotal(o), 0)
   const lowMarginProducts = products.filter(p => {
     const { marginPct } = calcMargin(p.current_buy_price, p.current_sell_price)
@@ -217,17 +217,19 @@ export default function DashboardClient({ activeSession, activeOrders, allOrders
       {/* Quick Links */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { href: '/orders', label: 'Input Pesanan', emoji: '📝', desc: 'Catat pesanan baru' },
-          { href: '/products', label: 'Kelola Produk', emoji: '🛍️', desc: 'Atur harga & produk' },
-          { href: '/sessions', label: 'Sesi PO', emoji: '📅', desc: 'Buat & kelola sesi' },
-          { href: '/reports', label: 'Laporan', emoji: '📊', desc: 'Laba rugi per sesi' },
+          { href: '/orders',   label: 'Input Pesanan', icon: ClipboardList, desc: 'Catat pesanan baru',   color: 'bg-orange-50 text-orange-600' },
+          { href: '/products', label: 'Kelola Produk', icon: Package,       desc: 'Atur harga & produk', color: 'bg-blue-50 text-blue-600' },
+          { href: '/sessions', label: 'Sesi PO',       icon: CalendarRange, desc: 'Buat & kelola sesi',  color: 'bg-green-50 text-green-600' },
+          { href: '/reports',  label: 'Laporan',       icon: BarChart3,     desc: 'Laba rugi per sesi',  color: 'bg-purple-50 text-purple-600' },
         ].map(item => (
           <Link
             key={item.href}
             href={item.href}
-            className="bg-white rounded-2xl p-4 border border-gray-100 hover:border-orange-200 hover:bg-orange-50 transition-colors"
+            className="bg-white rounded-2xl p-4 border border-gray-100 hover:border-orange-200 hover:bg-orange-50 transition-colors group"
           >
-            <p className="text-2xl mb-2">{item.emoji}</p>
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${item.color} group-hover:bg-orange-100 group-hover:text-orange-600 transition-colors`}>
+              <item.icon size={18} />
+            </div>
             <p className="text-sm font-semibold text-gray-900">{item.label}</p>
             <p className="text-xs text-gray-500 mt-0.5">{item.desc}</p>
           </Link>

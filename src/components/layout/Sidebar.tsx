@@ -37,11 +37,7 @@ export function Sidebar() {
     router.push('/login')
   }
 
-  const filteredNavItems = navItems.filter((item) => {
-    if (!item.permission) return true
-    // This will be checked in the component
-    return true
-  })
+  const filteredNavItems = navItems
 
   return (
     <aside className="hidden md:flex flex-col w-60 bg-white border-r border-gray-100 h-screen sticky top-0">
@@ -89,21 +85,22 @@ export function Sidebar() {
   )
 }
 
-function NavItem({ 
-  href, 
-  label, 
-  icon: Icon, 
-  permission, 
-  isActive 
-}: { 
+function NavItem({
+  href,
+  label,
+  icon: Icon,
+  permission,
+  isActive
+}: {
   href: string
   label: string
   icon: React.ElementType
   permission: string | null
   isActive: boolean
 }) {
-  const hasAccess = permission ? usePermission(permission as any) : true
-  
+  const { hasPermission } = useAuth()
+  const hasAccess = !permission || hasPermission(permission as Parameters<typeof hasPermission>[0])
+
   if (!hasAccess) return null
 
   return (

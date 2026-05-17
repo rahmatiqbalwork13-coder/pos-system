@@ -5,12 +5,14 @@ import { createClient } from '@/lib/supabase/client'
 import type { Order, OrderItem } from '@/lib/supabase/database.types'
 import { formatCurrency } from '@/lib/utils'
 import { X } from 'lucide-react'
+import ModalWrapper from '@/components/ui/ModalWrapper'
+import type { PaymentMethodItem } from '../settings/SettingsClient'
 
 type OrderWithItems = Order & { order_items: OrderItem[] }
 
 interface Props {
   order: OrderWithItems
-  paymentMethods: string[]
+  paymentMethods: PaymentMethodItem[]
   onUpdated: (order: OrderWithItems) => void
   onClose: () => void
 }
@@ -25,28 +27,37 @@ export default function PaymentModal({ order, paymentMethods, onUpdated, onClose
   const [paymentMethod, setPaymentMethod] = useState(order.payment_method ?? '')
   const [loading, setLoading] = useState(false)
 
+  const selectedMethodInfo = paymentMethods.find(m => m.name === paymentMethod)?.info ?? ''
+
   const remaining = totalTagihan - (parseFloat(amountPaid) || 0)
 
   async function handleSave() {
     setLoading(true)
-    const supabase = createClient()
-    const { data } = await supabase
-      .from('orders')
-      .update({
-        payment_status: status,
-        amount_paid: parseFloat(amountPaid) || 0,
-        payment_method: paymentMethod || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', order.id)
-      .select('*, order_items(*)')
-      .single()
-    if (data) onUpdated(data as OrderWithItems)
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('orders')
+        .update({
+          payment_status: status,
+          amount_paid: parseFloat(amountPaid) || 0,
+          payment_method: paymentMethod || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', order.id)
+        .select('*, order_items(*)')
+        .single()
+      if (error) throw error
+      if (data) onUpdated(data as OrderWithItems)
+    } catch (err) {
+      console.error('Error saving payment:', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50 p-0 md:p-4">
-      <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-2xl">
+    <ModalWrapper onClose={onClose} maxWidth="md:max-w-md">
+      <div>
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <div>
             <h2 className="font-semibold text-gray-900">Manajemen Pembayaran</h2>
@@ -131,8 +142,13 @@ export default function PaymentModal({ order, paymentMethods, onUpdated, onClose
               className="w-full px-3 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
             >
               <option value="">Pilih metode...</option>
-              {paymentMethods.map(m => <option key={m} value={m}>{m}</option>)}
+              {paymentMethods.map(m => <option key={m.name} value={m.name}>{m.name}</option>)}
             </select>
+            {selectedMethodInfo && (
+              <div className="mt-2 px-3 py-2 bg-orange-50 rounded-lg text-xs text-orange-700 font-medium">
+                {selectedMethodInfo}
+              </div>
+            )}
           </div>
 
           <div className="flex gap-3 pt-2">
@@ -147,6 +163,6 @@ export default function PaymentModal({ order, paymentMethods, onUpdated, onClose
           </div>
         </div>
       </div>
-    </div>
+    </ModalWrapper>
   )
 }
