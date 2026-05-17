@@ -15,6 +15,7 @@ import ExportButtons from '@/components/export/ExportButtons'
 import { usePermission } from '@/hooks/useAuth'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/hooks/useToast'
+import { useHaptic } from '@/hooks/usePWA'
 import type { PaymentMethodItem } from '../settings/SettingsClient'
 
 type OrderWithItems = Order & { order_items: OrderItem[] }
@@ -53,6 +54,7 @@ export default function OrdersClient({ initialOrders, sessions, products, catego
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const supabase = createClient()
   const { toast } = useToast()
+  const { success: hapticSuccess, error: hapticError, lightImpact } = useHaptic()
 
   // Permission checks
   const canDeleteOrders = usePermission('canDeleteOrders')
@@ -90,9 +92,11 @@ export default function OrdersClient({ initialOrders, sessions, products, catego
   async function handleDelete(id: string) {
     const { error } = await supabase.from('orders').delete().eq('id', id)
     if (error) {
+      hapticError()
       toast('Gagal menghapus pesanan. Silakan coba lagi.', 'error')
       return
     }
+    hapticSuccess()
     setOrders(prev => prev.filter(o => o.id !== id))
     setDeleteTargetId(null)
     toast('Pesanan berhasil dihapus', 'success')
@@ -108,8 +112,13 @@ export default function OrdersClient({ initialOrders, sessions, products, catego
         .eq('id', order.id)
         .select('*, order_items(*)')
         .single()
-      if (error) { toast('Gagal mengubah status pembayaran', 'error'); return }
+      if (error) { 
+        hapticError()
+        toast('Gagal mengubah status pembayaran', 'error'); 
+        return 
+      }
       if (data) {
+        hapticSuccess()
         setOrders(prev => prev.map(o => o.id === data.id ? data as OrderWithItems : o))
         toast('Status pembayaran diperbarui', 'success')
       }
@@ -119,6 +128,7 @@ export default function OrdersClient({ initialOrders, sessions, products, catego
   }
 
   function handleSaved(order: OrderWithItems) {
+    hapticSuccess()
     setOrders(prev => {
       const exists = prev.find(o => o.id === order.id)
       toast(exists ? 'Pesanan berhasil diperbarui' : 'Pesanan berhasil ditambahkan', 'success')
@@ -129,6 +139,7 @@ export default function OrdersClient({ initialOrders, sessions, products, catego
   }
 
   function handlePaymentUpdated(order: OrderWithItems) {
+    hapticSuccess()
     setOrders(prev => prev.map(o => o.id === order.id ? order : o))
     setPaymentOrder(null)
     toast('Pembayaran berhasil dicatat', 'success')
@@ -259,28 +270,28 @@ export default function OrdersClient({ initialOrders, sessions, products, catego
                   <div className="flex items-center gap-1 justify-end">
                     <button
                       onClick={() => setReceiptOrder(order)}
-                      className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg"
+                      className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center"
                       title="Struk"
                     >
-                      <Receipt size={14} />
+                      <Receipt size={20} />
                     </button>
                     <button
                       onClick={() => setPaymentOrder(order)}
-                      className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg text-xs"
+                      className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center text-lg"
                       title="Pembayaran"
                     >💳</button>
                     <button
                       onClick={() => { setEditOrder(order); setShowForm(true) }}
-                      className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg"
+                      className="p-2 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center"
                     >
-                      <Edit2 size={14} />
+                      <Edit2 size={20} />
                     </button>
                     {canDeleteOrders && (
                       <button
                         onClick={() => setDeleteTargetId(order.id)}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={20} />
                       </button>
                     )}
                   </div>

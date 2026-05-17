@@ -18,7 +18,8 @@ export function formatNumber(amount: number): string {
   return new Intl.NumberFormat('id-ID').format(amount)
 }
 
-export function maskPhone(phone: string): string {
+export function maskPhone(phone: string | null | undefined): string {
+  if (!phone) return '-'
   if (phone.length <= 7) return phone
   return phone.slice(0, 4) + '****' + phone.slice(-3)
 }

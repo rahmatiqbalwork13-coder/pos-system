@@ -60,8 +60,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 {t.message}
               </RadixToast.Description>
               <RadixToast.Close asChild>
-                <button className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity">
-                  <X size={16} />
+                <button className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-black/5">
+                  <X size={20} />
                 </button>
               </RadixToast.Close>
             </RadixToast.Root>

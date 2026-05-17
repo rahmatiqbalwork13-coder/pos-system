@@ -78,10 +78,12 @@ export default function OrderForm({ order, sessions, products, categories, defau
     e.preventDefault()
     if (!sessionId) return setError('Pilih sesi PO terlebih dahulu')
     if (!customerName.trim()) return setError('Nama customer wajib diisi')
-    if (!customerPhone.trim()) return setError('Nomor HP wajib diisi')
-    const phoneClean = customerPhone.replace(/\s+/g, '')
-    if (!/^(08|628|\+628)\d{7,11}$/.test(phoneClean)) {
-      return setError('Nomor HP tidak valid. Contoh: 08123456789 atau 628123456789')
+    // Nomor HP opsional - hanya validasi jika diisi
+    if (customerPhone.trim()) {
+      const phoneClean = customerPhone.replace(/\s+/g, '')
+      if (!/^(08|628|\+628)\d{7,11}$/.test(phoneClean)) {
+        return setError('Nomor HP tidak valid. Contoh: 08123456789 atau 628123456789')
+      }
     }
     if (cart.length === 0) return setError('Tambahkan minimal 1 produk')
     setLoading(true)
@@ -92,7 +94,7 @@ export default function OrderForm({ order, sessions, products, categories, defau
       const orderPayload = {
         session_id: sessionId,
         customer_name: customerName,
-        customer_phone: customerPhone,
+        customer_phone: customerPhone.trim() || null,
         source: source as Order['source'],
         delivery_type: deliveryType as Order['delivery_type'],
         delivery_note: deliveryNote || null,
@@ -173,7 +175,7 @@ export default function OrderForm({ order, sessions, products, categories, defau
       <div className="flex flex-col max-h-[95vh]">
         <div className="flex items-center justify-between p-5 border-b border-gray-100 flex-shrink-0">
           <h2 className="font-semibold text-gray-900">{order ? 'Edit Pesanan' : 'Input Pesanan Baru'}</h2>
-          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600"><X size={20} /></button>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"><X size={20} /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
@@ -205,7 +207,7 @@ export default function OrderForm({ order, sessions, products, categories, defau
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Nomor HP *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Nomor HP (opsional)</label>
                 <input
                   value={customerPhone}
                   onChange={e => setCustomerPhone(e.target.value)}

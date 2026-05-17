@@ -123,7 +123,7 @@ export type Database = {
           id: string
           session_id: string
           customer_name: string
-          customer_phone: string
+          customer_phone: string | null
           source: 'whatsapp' | 'instagram' | 'tatap_muka'
           delivery_type: 'pickup' | 'antar_langsung' | 'gosend' | 'grabsend' | 'lainnya'
           delivery_note: string | null
@@ -141,7 +141,7 @@ export type Database = {
           id?: string
           session_id: string
           customer_name: string
-          customer_phone: string
+          customer_phone?: string | null
           source: 'whatsapp' | 'instagram' | 'tatap_muka'
           delivery_type?: 'pickup' | 'antar_langsung' | 'gosend' | 'grabsend' | 'lainnya'
           delivery_note?: string | null
@@ -158,7 +158,7 @@ export type Database = {
         Update: {
           session_id?: string
           customer_name?: string
-          customer_phone?: string
+          customer_phone?: string | null
           source?: 'whatsapp' | 'instagram' | 'tatap_muka'
           delivery_type?: 'pickup' | 'antar_langsung' | 'gosend' | 'grabsend' | 'lainnya'
           delivery_note?: string | null

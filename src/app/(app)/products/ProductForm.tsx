@@ -100,7 +100,7 @@ export default function ProductForm({ product, categories, onSaved, onClose }: P
       <div className="overflow-y-auto">
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">{product ? 'Edit Produk' : 'Tambah Produk'}</h2>
-          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors">
             <X size={20} />
           </button>
         </div>

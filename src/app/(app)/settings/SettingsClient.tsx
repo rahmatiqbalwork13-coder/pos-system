@@ -181,9 +181,9 @@ export default function SettingsClient({ initialCategories, initialPaymentMethod
                 </button>
                 <button
                   onClick={() => deleteCategory(cat.id)}
-                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+                  className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={20} />
                 </button>
               </div>
             ))}
@@ -235,9 +235,9 @@ export default function SettingsClient({ initialCategories, initialPaymentMethod
                   <p className="text-sm font-semibold text-gray-900">{method.name}</p>
                   <button
                     onClick={() => removePayment(method.name)}
-                    className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center"
                   >
-                    <X size={14} />
+                    <X size={20} />
                   </button>
                 </div>
                 <input

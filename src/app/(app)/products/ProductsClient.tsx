@@ -9,6 +9,7 @@ import ProductForm from './ProductForm'
 import PriceHistoryModal from './PriceHistoryModal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import { useToast } from '@/hooks/useToast'
+import { useHaptic } from '@/hooks/usePWA'
 
 interface Props {
   initialProducts: Product[]
@@ -28,6 +29,7 @@ export default function ProductsClient({ initialProducts, initialCategories }: P
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const supabase = createClient()
   const { toast } = useToast()
+  const { success: hapticSuccess, error: hapticError } = useHaptic()
 
   const filtered = products.filter(p => {
     if (filterCategory !== 'all' && p.category !== filterCategory) return false
@@ -43,9 +45,11 @@ export default function ProductsClient({ initialProducts, initialCategories }: P
   async function handleDelete(id: string) {
     const { error } = await supabase.from('products').delete().eq('id', id)
     if (error) {
+      hapticError()
       toast('Gagal menghapus produk. Silakan coba lagi.', 'error')
       return
     }
+    hapticSuccess()
     setProducts(prev => prev.filter(p => p.id !== id))
     setDeleteTargetId(null)
     toast('Produk berhasil dihapus', 'success')
@@ -61,8 +65,13 @@ export default function ProductsClient({ initialProducts, initialCategories }: P
         .eq('id', product.id)
         .select()
         .single()
-      if (error) { toast('Gagal mengubah status produk', 'error'); return }
+      if (error) { 
+        hapticError()
+        toast('Gagal mengubah status produk', 'error'); 
+        return 
+      }
       if (data) {
+        hapticSuccess()
         setProducts(prev => prev.map(p => p.id === data.id ? data : p))
         toast(`Produk ${data.is_active ? 'diaktifkan' : 'dinonaktifkan'}`, 'success')
       }
@@ -72,6 +81,7 @@ export default function ProductsClient({ initialProducts, initialCategories }: P
   }
 
   function handleSaved(product: Product) {
+    hapticSuccess()
     setProducts(prev => {
       const exists = prev.find(p => p.id === product.id)
       toast(exists ? 'Produk berhasil diperbarui' : 'Produk berhasil ditambahkan', 'success')
@@ -198,22 +208,22 @@ export default function ProductsClient({ initialProducts, initialCategories }: P
                     <div className="flex items-center gap-1 justify-end">
                       <button
                         onClick={() => setHistoryProductId(product.id)}
-                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
                         title="Riwayat Harga"
                       >
-                        <History size={15} />
+                        <History size={20} />
                       </button>
                       <button
                         onClick={() => { setEditProduct(product); setShowForm(true) }}
-                        className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                        className="p-2 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
                       >
-                        <Edit2 size={15} />
+                        <Edit2 size={20} />
                       </button>
                       <button
                         onClick={() => setDeleteTargetId(product.id)}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
                       >
-                        <Trash2 size={15} />
+                        <Trash2 size={20} />
                       </button>
                     </div>
                   </td>
@@ -268,21 +278,21 @@ export default function ProductsClient({ initialProducts, initialCategories }: P
               <div className="flex gap-2 justify-end border-t border-gray-50 pt-3">
                 <button
                   onClick={() => setHistoryProductId(product.id)}
-                  className="flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg"
+                  className="flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-3 py-2 rounded-lg min-h-[44px]"
                 >
-                  <History size={13} /> Riwayat
+                  <History size={16} /> Riwayat
                 </button>
                 <button
                   onClick={() => { setEditProduct(product); setShowForm(true) }}
-                  className="flex items-center gap-1 text-xs text-orange-600 bg-orange-50 px-3 py-1.5 rounded-lg"
+                  className="flex items-center gap-1 text-xs text-orange-600 bg-orange-50 px-3 py-2 rounded-lg min-h-[44px]"
                 >
-                  <Edit2 size={13} /> Edit
+                  <Edit2 size={16} /> Edit
                 </button>
                 <button
                   onClick={() => setDeleteTargetId(product.id)}
-                  className="flex items-center gap-1 text-xs text-red-600 bg-red-50 px-3 py-1.5 rounded-lg"
+                  className="flex items-center gap-1 text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg min-h-[44px]"
                 >
-                  <Trash2 size={13} /> Hapus
+                  <Trash2 size={16} /> Hapus
                 </button>
               </div>
             </div>

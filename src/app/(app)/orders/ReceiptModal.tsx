@@ -147,7 +147,7 @@ export default function ReceiptModal({ order, businessName, businessInfo, onClos
       `📅 ${format(new Date(order.created_at), 'dd MMMM yyyy, HH:mm', { locale: id })}`,
       ``,
       `👤 Pelanggan: ${order.customer_name}`,
-      `📱 HP: ${order.customer_phone}`,
+      order.customer_phone ? `📱 HP: ${order.customer_phone}` : null,
       `📍 Sumber: ${sourceLabel(order.source)}`,
       `🚚 Pengiriman: ${deliveryLabel(order.delivery_type)}`,
       ``,
@@ -198,7 +198,7 @@ export default function ReceiptModal({ order, businessName, businessInfo, onClos
       ``,
       `*👤 Pelanggan:*`,
       `Nama: ${order.customer_name}`,
-      `HP: ${order.customer_phone}`,
+      order.customer_phone ? `HP: ${order.customer_phone}` : null,
       ``,
       `*🛒 Item Pesanan:*`,
       ...order.order_items.map(i =>
@@ -223,6 +223,10 @@ export default function ReceiptModal({ order, businessName, businessInfo, onClos
       `_Terima kasih sudah memesan! 🙏_`,
     ].filter(Boolean).join('\n')
 
+    if (!order.customer_phone) {
+      alert('Nomor WhatsApp tidak tersedia untuk pesanan ini.')
+      return
+    }
     window.open(`https://wa.me/${order.customer_phone}?text=${encodeURIComponent(lines)}`, '_blank')
   }
 
@@ -252,7 +256,7 @@ export default function ReceiptModal({ order, businessName, businessInfo, onClos
               </button>
             </div>
           </div>
-          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors">
             <X size={20} />
           </button>
         </div>
@@ -292,10 +296,12 @@ export default function ReceiptModal({ order, businessName, businessInfo, onClos
                     <span className="text-gray-500">Pelanggan</span>
                     <span className="font-medium">{order.customer_name}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">HP</span>
-                    <span>{order.customer_phone}</span>
-                  </div>
+                  {order.customer_phone && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">HP</span>
+                      <span>{order.customer_phone}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-gray-500">Kirim</span>
                     <span>{deliveryLabel(order.delivery_type)}</span>
@@ -405,7 +411,7 @@ export default function ReceiptModal({ order, businessName, businessInfo, onClos
                   <div>
                     <p className="a4-section-title">Kepada</p>
                     <p className="font-bold text-gray-900">{order.customer_name}</p>
-                    <p className="text-sm text-gray-600 mt-1">{order.customer_phone}</p>
+                    {order.customer_phone && <p className="text-sm text-gray-600 mt-1">{order.customer_phone}</p>}
                     <p className="text-sm text-gray-600">{deliveryLabel(order.delivery_type)}</p>
                   </div>
                 </div>
@@ -516,7 +522,8 @@ export default function ReceiptModal({ order, businessName, businessInfo, onClos
         <div className="flex flex-wrap gap-2 p-4 border-t border-gray-100 bg-white flex-shrink-0">
           <button
             onClick={handleWhatsApp}
-            className="flex items-center justify-center gap-2 py-2.5 px-4 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-medium transition-colors"
+            disabled={!order.customer_phone}
+            className="flex items-center justify-center gap-2 py-2.5 px-4 bg-green-500 hover:bg-green-600 disabled:bg-green-300 disabled:cursor-not-allowed text-white rounded-xl text-sm font-medium transition-colors"
           >
             <MessageCircle size={16} />
             Kirim WA

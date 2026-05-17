@@ -65,8 +65,10 @@ export function InvoicePrint({ order, businessName, businessInfo, format: printF
       
       doc.text(`Pelanggan: ${order.customer_name}`, 5, y)
       y += 5
-      doc.text(`HP: ${order.customer_phone}`, 5, y)
-      y += 5
+      if (order.customer_phone) {
+        doc.text(`HP: ${order.customer_phone}`, 5, y)
+        y += 5
+      }
       doc.text(`Kirim: ${deliveryLabel(order.delivery_type)}`, 5, y)
       y += 10
       
@@ -164,7 +166,9 @@ export function InvoicePrint({ order, businessName, businessInfo, format: printF
       if (businessInfo?.address) {
         doc.text(businessInfo.address, 20, y)
       }
-      doc.text(order.customer_phone, 110, y)
+      if (order.customer_phone) {
+        doc.text(order.customer_phone, 110, y)
+      }
       y += 15
       
       // Table header
@@ -339,10 +343,12 @@ function ThermalFormat({ order, businessName, businessInfo, subtotal, ongkir, to
           <span className="text-gray-500">Pelanggan</span>
           <span className="font-medium">{order.customer_name}</span>
         </div>
-        <div className="flex justify-between">
-          <span className="text-gray-500">HP</span>
-          <span>{order.customer_phone}</span>
-        </div>
+        {order.customer_phone && (
+          <div className="flex justify-between">
+            <span className="text-gray-500">HP</span>
+            <span>{order.customer_phone}</span>
+          </div>
+        )}
         <div className="flex justify-between">
           <span className="text-gray-500">Kirim</span>
           <span>{deliveryLabel(order.delivery_type)}</span>
@@ -456,7 +462,7 @@ function A4Format({ order, businessName, businessInfo, subtotal, ongkir, total, 
         <div>
           <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Kepada</p>
           <p className="font-bold text-gray-900 text-lg">{order.customer_name}</p>
-          <p className="text-sm text-gray-600 mt-1">{order.customer_phone}</p>
+          {order.customer_phone && <p className="text-sm text-gray-600 mt-1">{order.customer_phone}</p>}
           <p className="text-sm text-gray-600">{deliveryLabel(order.delivery_type)}</p>
           <p className="text-sm text-gray-600">Sumber: {sourceLabel(order.source)}</p>
         </div>

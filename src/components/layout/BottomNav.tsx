@@ -9,7 +9,7 @@ import {
   ShoppingBag,
   Package,
   CalendarRange,
-  BarChart3,
+  User,
 } from 'lucide-react'
 
 const allNavItems = [
@@ -17,7 +17,7 @@ const allNavItems = [
   { href: '/orders',     label: 'Pesanan',   icon: ShoppingBag,     permission: 'canManageOrders' },
   { href: '/products',   label: 'Produk',    icon: Package,         permission: 'canManageProducts' },
   { href: '/sessions',   label: 'Sesi PO',   icon: CalendarRange,   permission: 'canManageSessions' },
-  { href: '/reports',    label: 'Laporan',   icon: BarChart3,        permission: 'canViewReports' },
+  { href: '/settings',   label: 'Akun',      icon: User,            permission: null },
 ]
 
 export function BottomNav() {
@@ -29,7 +29,10 @@ export function BottomNav() {
   )
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
+    <nav 
+      className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
       <div className="flex">
         {visibleItems.map(({ href, label, icon: Icon }) => {
           const isActive = pathname.startsWith(href)
